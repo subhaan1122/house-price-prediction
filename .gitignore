@@ -4,3 +4,25 @@ __pycache__/
 *.pyd
 *.db
 .env
+
+
+# Large data files
+data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+
+# Jupyter notebooks
+*.ipynb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
