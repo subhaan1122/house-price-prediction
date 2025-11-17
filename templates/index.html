@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏠 AI House Price Predictor | Professional Grade</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏠 AI House Price Predictor</h1>
+            <p>Professional-grade price estimation powered by Machine Learning</p>
+            <div class="model-badge">
+                <span class="accuracy-badge">Model Accuracy: 91.5%</span>
+                <span class="rmse-badge">RMSE: $25,511</span>
+            </div>
+        </header>
+
+        {% if not model_loaded %}
+        <div class="error-message">
+            <h3>⚠️ Model Not Loaded</h3>
+            <p>Please train the model first by running <code>python train_model.py</code></p>
+        </div>
+        {% endif %}
+
+        <div class="prediction-form">
+            <h2>🏡 Enter House Details</h2>
+            <form id="priceForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="TotalSF">Total Square Feet *</label>
+                        <input type="number" id="TotalSF" name="TotalSF" required min="500" max="10000" value="2000">
+                        <small>Living area + basement</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="OverallQual">Overall Quality (1-10) *</label>
+                        <input type="number" id="OverallQual" name="OverallQual" required min="1" max="10" value="6">
+                        <small>10 = Excellent, 1 = Very Poor</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="GarageCars">Garage Size (cars)</label>
+                        <input type="number" id="GarageCars" name="GarageCars" min="0" max="4" value="2">
+                        <small>Number of cars that fit</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="FullBath">Full Bathrooms</label>
+                        <input type="number" id="FullBath" name="FullBath" min="0" max="5" value="2">
+                        <small>Complete bathrooms</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="BedroomAbvGr">Bedrooms</label>
+                        <input type="number" id="BedroomAbvGr" name="BedroomAbvGr" min="1" max="6" value="3">
+                        <small>Above grade bedrooms</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="YearBuilt">Year Built</label>
+                        <input type="number" id="YearBuilt" name="YearBuilt" min="1800" max="2024" value="2000">
+                        <small>Original construction year</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="GrLivArea">Living Area (sq ft)</label>
+                        <input type="number" id="GrLivArea" name="GrLivArea" min="500" max="5000" value="1500">
+                        <small>Above grade living area</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="TotalBath">Total Bathrooms</label>
+                        <input type="number" id="TotalBath" name="TotalBath" min="0" max="6" step="0.5" value="2.5">
+                        <small>Full + 0.5 × Half baths</small>
+                    </div>
+                </div>
+                
+                <button type="submit" id="predictBtn" {% if not model_loaded %}disabled{% endif %}>
+                    {% if model_loaded %}
+                    🚀 Predict House Price
+                    {% else %}
+                    ⚠️ Model Not Available
+                    {% endif %}
+                </button>
+            </form>
+        </div>
+
+        <div id="result" class="result hidden">
+            <div class="result-header">
+                <h2>💰 Predicted House Price</h2>
+                <span class="timestamp" id="timestamp"></span>
+            </div>
+            
+            <div class="price-display">
+                <span id="predictedPrice" class="price">$0</span>
+                <div class="price-subtitle">Estimated Market Value</div>
+            </div>
+            
+            <div class="confidence-interval">
+                <h3>📊 Confidence Range</h3>
+                <p>We're 68% confident the true price is between:</p>
+                <div class="range-display">
+                    <span id="confidenceRange">$0 - $0</span>
+                </div>
+            </div>
+
+            <div class="model-performance">
+                <h3>🎯 Model Performance</h3>
+                <div class="stats-grid">
+                    <div class="stat">
+                        <label>Accuracy (R²):</label>
+                        <span id="modelR2">91.5%</span>
+                    </div>
+                    <div class="stat">
+                        <label>Error Margin (RMSE):</label>
+                        <span id="modelRMSE">$25,511</span>
+                    </div>
+                    <div class="stat">
+                        <label>Prediction Accuracy:</label>
+                        <span id="predictionAccuracy">~85%</span>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="resetForm()" class="reset-btn">🔄 Predict Another House</button>
+        </div>
+
+        <div id="error" class="error hidden">
+            <div class="error-icon">❌</div>
+            <div class="error-content">
+                <h3>Prediction Failed</h3>
+                <p id="errorMessage">An error occurred while predicting</p>
+            </div>
+        </div>
+
+        <footer class="app-footer">
+            <p>Powered by XGBoost Machine Learning | RMSE: ${{ "%.2f"|format(rmse) }} | R²: {{ "%.3f"|format(r2) }}</p>
+            <p><a href="/features">View Model Features</a> | <a href="/api/model-info">API Info</a></p>
+        </footer>
+    </div>
+
+    <script>
+                // Form submission handler
+        document.getElementById('priceForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const predictBtn = document.getElementById('predictBtn');
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            
+            // UI state updates
+            predictBtn.disabled = true;
+            predictBtn.innerHTML = '⏳ Analyzing...';
+            resultDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            
+            try {
+                // Get and validate form data
+                const formData = new FormData(this);
+                const data = {};
+                
+                // Convert FormData to object with proper number conversion
+                for (let [key, value] of formData.entries()) {
+                    if (value.trim() === '') {
+                        data[key] = 0;
+                    } else {
+                        data[key] = parseFloat(value) || 0;
+                    }
+                }
+                
+                console.log('📤 Sending data to server:', data);
+                
+                // Make API request with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log('📥 Received response:', result);
+                
+                if (result.success) {
+                    // Update UI with results
+                    document.getElementById('predictedPrice').textContent = result.prediction_formatted;
+                    document.getElementById('confidenceRange').textContent = result.confidence_range;
+                    document.getElementById('modelRMSE').textContent = result.model_performance.rmse;
+                    document.getElementById('modelR2').textContent = result.model_performance.r2;
+                    document.getElementById('predictionAccuracy').textContent = result.model_performance.accuracy;
+                    document.getElementById('timestamp').textContent = result.timestamp;
+                    
+                    resultDiv.classList.remove('hidden');
+                    
+                    // Smooth scroll to results
+                    resultDiv.scrollIntoView({ behavior: 'smooth' });
+                    
+                } else {
+                    throw new Error(result.error || 'Prediction failed. Please try again.');
+                }
+                
+            } catch (error) {
+                console.error('❌ Prediction error:', error);
+                let errorMessage = 'An error occurred while predicting. ';
+                
+                if (error.name === 'AbortError') {
+                    errorMessage += 'Request timed out. Please try again.';
+                } else if (error.message.includes('Server error')) {
+                    errorMessage += 'Server issue. Please try again.';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                document.getElementById('errorMessage').textContent = errorMessage;
+                errorDiv.classList.remove('hidden');
+                errorDiv.scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            // Reset button state
+            predictBtn.disabled = false;
+            predictBtn.innerHTML = '🚀 Predict House Price';
+        });
+
+        // Reset form function
+        function resetForm() {
+            document.getElementById('priceForm').reset();
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            
+            // Scroll back to form
+            document.querySelector('.prediction-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Input validation
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('blur', function() {
+                const min = parseFloat(this.min) || 0;
+                const max = parseFloat(this.max) || Infinity;
+                let value = parseFloat(this.value) || 0;
+                
+                if (value < min) {
+                    this.value = min;
+                    showInputError(this, `Minimum value is ${min}`);
+                } else if (value > max) {
+                    this.value = max;
+                    showInputError(this, `Maximum value is ${max}`);
+                } else {
+                    clearInputError(this);
+                }
+            });
+        });
+
+        function showInputError(input, message) {
+            clearInputError(input);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'input-error';
+            errorDiv.textContent = message;
+            input.parentNode.appendChild(errorDiv);
+            input.style.borderColor = '#e74c3c';
+        }
+
+        function clearInputError(input) {
+            const existingError = input.parentNode.querySelector('.input-error');
+            if (existingError) {
+                existingError.remove();
+            }
+            input.style.borderColor = '';
+        }
+    </script>
+</body>
+</html>
