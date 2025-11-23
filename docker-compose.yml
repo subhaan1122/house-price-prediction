@@ -1,0 +1,15 @@
+# docker-compose.yml
+version: "3.8"
+services:
+  web:
+    build: .
+    image: house-price-predictor:dev
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - DEBUG=True
+    volumes:
+      - ./:/app   # Mount code (so edits reflect immediately)
+      - ./models:/app/models  # Ensure local models are used
+    command: gunicorn -w 2 -b 0.0.0.0:5000 app:app
