@@ -1,28 +1,18 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-.env
-
-
-# Large data files
+# Data files
+*.csv
+*.xlsx
 data/
 
-# Python cache
+# Model files
+models/*.pkl
+models/*.joblib
+
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
 
-# Environment variables
+# Environment
 .env
-
-# Jupyter notebooks
-*.ipynb
 
 # OS files
 .DS_Store
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
